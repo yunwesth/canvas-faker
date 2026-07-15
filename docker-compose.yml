@@ -1,0 +1,24 @@
+# Convenience wrapper for canvas-faker.
+#
+#   docker compose run --rm gen                          # small/seed=42 -> ./out/cd2.db
+#   docker compose run --rm gen --scale medium --seed 99 # override any flag
+#   docker compose run --rm gen --clean --out /data/clean.db
+#
+# Generated databases land in ./out on the host (mounted at /data).
+#
+# The `user:` line makes the container write files as YOUR host uid/gid so the
+# generated .db is owned by you (not root). Export them once per shell:
+#
+#   export UID="$(id -u)" GID="$(id -g)"
+#
+# (falls back to 1000:1000 if unset).
+
+services:
+  gen:
+    build: .
+    image: canvas-faker:latest
+    user: "${UID:-1000}:${GID:-1000}"
+    volumes:
+      - ./out:/data
+    # ENTRYPOINT is `canvas-faker`; args here override the image CMD.
+    command: ["--out", "/data/cd2.db", "--scale", "small", "--seed", "42"]

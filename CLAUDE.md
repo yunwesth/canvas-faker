@@ -239,6 +239,22 @@ Registered via `fake.add_provider(CanvasProvider(fake))` in `generate.py`.
 - **README.md** has usage examples and API reference
 - **tests/** provide verification before shipping
 
+### Docker (containerized)
+
+- **Dockerfile** — multi-stage: `builder` produces a wheel via `python -m build`;
+  `runtime` (python:3.12-slim) installs only the wheel + faker. No build tooling
+  in the final image. Runs as non-root user `canvas`; entrypoint is the
+  `canvas-faker` CLI; `CMD` defaults to `--out /data/cd2.db --scale small --seed 42`.
+- **`/data`** is the volume mount point for generated databases.
+- **.dockerignore** — excludes `.git`, caches, venvs, `*.db`, and scratch docs.
+- **docker-compose.yml** — `gen` service; `user: "${UID:-1000}:${GID:-1000}"` so
+  output is owned by the host user (mounts `./out` -> `/data`).
+- **Key gotcha**: host user here is uid **1007**, not 1000, so bind-mounted output
+  requires `--user $(id -u):$(id -g)` (raw `docker run`) or `export UID GID`
+  (compose) — otherwise `unable to open database file`.
+- **Verified**: build succeeds; `docker run --rm --user $(id -u):$(id -g) -v
+  $PWD/out:/data canvas-faker:latest` produces a valid DB (76 users, 8 courses).
+
 ## Future Enhancements (Out of Scope)
 
 1. **JSONL/CSV exporters**: Behind the same generator, write to files instead of SQLite

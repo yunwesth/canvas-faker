@@ -62,6 +62,52 @@ cfg = GenerationConfig(
 conn = generate_dataset(cfg, "cd2.db")
 ```
 
+## Docker
+
+Run canvas-faker in a container — no local Python or venv required. The generated
+`.db` is written to a mounted host directory.
+
+### Build
+
+```bash
+docker build -t canvas-faker:latest .
+```
+
+### Run
+
+Mount a host directory at `/data` and pass `--user` so the output file is owned by
+you (not root):
+
+```bash
+# Default: small dataset, seed 42 -> ./out/cd2.db
+mkdir -p out
+docker run --rm --user $(id -u):$(id -g) -v "$PWD/out:/data" canvas-faker:latest
+
+# Override any CLI flag
+docker run --rm --user $(id -u):$(id -g) -v "$PWD/out:/data" \
+  canvas-faker:latest --scale medium --seed 99 --out /data/medium.db
+
+# Clean data (no messiness)
+docker run --rm --user $(id -u):$(id -g) -v "$PWD/out:/data" \
+  canvas-faker:latest --clean --out /data/clean.db
+```
+
+### Docker Compose
+
+```bash
+export UID="$(id -u)" GID="$(id -g)"      # so output is owned by you
+docker compose run --rm gen                          # -> ./out/cd2.db
+docker compose run --rm gen --scale medium --seed 99 # override flags
+```
+
+### Notes
+
+- Multi-stage build: a wheel is built in a `builder` stage, then installed into a
+  slim runtime — no build tooling ships in the final image.
+- Runs as a non-root user; `/data` is the volume mount point.
+- The image entrypoint is the `canvas-faker` CLI, so anything after the image name
+  is passed straight through as CLI flags.
+
 ## Schema Coverage
 
 ### Story Tables (correlated, deep)
