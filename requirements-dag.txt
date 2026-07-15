@@ -1,0 +1,5 @@
+# Dependencies for the nv-live seed DAG (dags/nv_demo_seed.py).
+# Install into the project venv:  pip install -r requirements-dag.txt
+prefect>=3.0
+SQLAlchemy>=2.0
+psycopg2-binary>=2.9

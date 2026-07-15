@@ -273,7 +273,4 @@ Registered via `fake.add_provider(CanvasProvider(fake))` in `generate.py`.
 - **skill reference**: `/canvas-data-2` (loaded via `/canvas-data-2` skill for CD2 schema)
 
 ## Progress Log
-- [session:347f867f] 2026-07-15 14:59 — edited datasette-metadata.json,docker-compose.yml Dockerfile.datasette,.dockerignore
-- [session:347f867f] 2026-07-15 15:12 — edited canvas_faker/cli.py,canvas_faker/generate.py canvas_faker/schema.py,canvas_faker/writers/postgres_writer.py docker-compose.yml,Dockerfile pyproject.toml
-- [session:347f867f] 2026-07-15 15:17 — edited docker-compose.yml
-- [session:347f867f] 2026-07-15 15:22 — edited canvas_faker/schema.py,canvas_faker/writers/postgres_writer.py
+- 2026-07-15 — session 347f867f: 5 turn(s), 7 file(s): canvas_faker/cli.py,canvas_faker/generate.py canvas_faker/schema.py canvas_faker/schema.py,canvas_faker/writers/postgres_writer.py canvas_faker/writers/postgres_writer.py docker-compose.yml,dags/sql/00_schemas.sql datasette-metadata.json,docker-compose.yml docker-compose.yml Dockerfile.datasette,Dockerfile pyproject.toml .dockerignore,requirements-dag.txt
