@@ -8,11 +8,20 @@ from .generate import generate_dataset
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Generate a fake Canvas Data 2 dataset in SQLite."
+        description="Generate a fake Canvas Data 2 dataset (SQLite or PostgreSQL)."
     )
     parser.add_argument(
-        "--out", "-o", default="cd2.db",
-        help="Output SQLite path (default: cd2.db)"
+        "--out", "-o", default=None,
+        help="Output SQLite path (default: cd2.db). Ignored when --pg-url is set."
+    )
+    parser.add_argument(
+        "--pg-url", default=None,
+        metavar="DSN",
+        help=(
+            "Write to PostgreSQL instead of SQLite. "
+            "Accepts a libpq connection string, e.g. "
+            "postgresql://canvas:canvas@localhost:5432/cd2"
+        ),
     )
     parser.add_argument(
         "--seed", "-s", type=int, default=1234,
@@ -20,7 +29,7 @@ def main() -> int:
     )
     parser.add_argument(
         "--scale", choices=["small", "medium", "large"], default="small",
-        help="Dataset scale: small (~200 rows), medium (~4k rows), large (~40k rows)"
+        help="Dataset scale: small (~11k rows), medium (~4k rows), large (~40k rows)"
     )
     parser.add_argument(
         "--messiness", "-m", type=float, default=0.3,
@@ -33,7 +42,10 @@ def main() -> int:
 
     args = parser.parse_args()
 
-    from .config import MessinessConfig
+    if args.pg_url and args.out:
+        print("Warning: --out is ignored when --pg-url is set.", file=sys.stderr)
+
+    output_dest = args.pg_url or args.out or "cd2.db"
 
     cfg = GenerationConfig(
         seed=args.seed,
@@ -45,17 +57,17 @@ def main() -> int:
     )
 
     print(f"Generating Canvas Data 2 dataset...")
-    print(f"  Output: {args.out}")
+    print(f"  Output: {output_dest}")
     print(f"  Scale: {args.scale}")
     print(f"  Seed: {args.seed}")
     print(f"  Messiness intensity: {cfg.messiness.intensity if cfg.messiness.enabled else 0.0}")
     print()
 
     try:
-        conn = generate_dataset(cfg, args.out)
+        conn = generate_dataset(cfg, args.out, pg_url=args.pg_url)
         conn.close()
         print()
-        print(f"✓ Dataset generated: {args.out}")
+        print(f"✓ Dataset generated: {output_dest}")
         return 0
     except Exception as e:
         print(f"✗ Error: {e}", file=sys.stderr)

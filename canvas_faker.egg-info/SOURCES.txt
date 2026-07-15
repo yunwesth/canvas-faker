@@ -1,6 +1,7 @@
 README.md
 pyproject.toml
 canvas_faker/__init__.py
+canvas_faker/__main__.py
 canvas_faker/cli.py
 canvas_faker/config.py
 canvas_faker/generate.py
@@ -20,5 +21,6 @@ canvas_faker/generators/canvas_logs.py
 canvas_faker/generators/catalog.py
 canvas_faker/generators/new_quizzes.py
 canvas_faker/writers/__init__.py
+canvas_faker/writers/postgres_writer.py
 canvas_faker/writers/sqlite_writer.py
 tests/test_integrity.py

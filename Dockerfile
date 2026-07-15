@@ -23,9 +23,9 @@ FROM python:3.12-slim AS runtime
 # Non-root user for safety
 RUN useradd --create-home --uid 1000 canvas
 
-# Install the built wheel (pulls in faker), then discard build artifacts
+# Install the built wheel (pulls in faker) + psycopg2 for Postgres output
 COPY --from=builder /build/dist/*.whl /tmp/
-RUN pip install --no-cache-dir /tmp/*.whl && rm -f /tmp/*.whl
+RUN pip install --no-cache-dir /tmp/*.whl psycopg2-binary && rm -f /tmp/*.whl
 
 # /data is the mount point for generated databases
 RUN mkdir -p /data && chown canvas:canvas /data

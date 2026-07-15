@@ -1,0 +1,38 @@
+# syntax=docker/dockerfile:1
+#
+# Serve the pre-generated sample CD2 database with Datasette.
+#   - Bakes ./out/cd2.db into the image (immutable, read-only serving).
+#   - Browse tables + a JSON/SQL query API at http://localhost:8001
+#
+# Build:  docker build -f Dockerfile.datasette -t canvas-faker-datasette:latest .
+# Run:    docker run --rm -p 8001:8001 canvas-faker-datasette:latest
+#
+# NOTE: ./out/cd2.db must exist in the build context. Generate it first:
+#   docker compose run --rm gen      (or)   python -m canvas_faker --out out/cd2.db
+
+FROM python:3.12-slim AS runtime
+
+# Datasette + a couple of high-value plugins (visual table exploration).
+RUN pip install --no-cache-dir \
+      datasette \
+      datasette-cluster-map
+
+# Non-root user for safety
+RUN useradd --create-home --uid 1000 canvas
+
+# Bake the sample database + metadata into the image.
+COPY out/cd2.db /data/cd2.db
+COPY datasette-metadata.json /data/metadata.json
+RUN chown -R canvas:canvas /data
+
+USER canvas
+WORKDIR /data
+
+EXPOSE 8001
+
+# -i = immutable: DB is read-only, lets Datasette cache aggressively.
+# --cors so the JSON API is usable from browser front-ends.
+ENTRYPOINT ["datasette", "serve", "-i", "/data/cd2.db", \
+            "--metadata", "/data/metadata.json", \
+            "--host", "0.0.0.0", "--port", "8001", \
+            "--cors", "--setting", "sql_time_limit_ms", "8000"]

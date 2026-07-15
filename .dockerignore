@@ -24,6 +24,8 @@ env/
 *.db
 *.sqlite
 *.sqlite3
+# ...except the sample DB we deliberately bake into the Datasette image.
+!out/cd2.db
 
 # Editor / OS cruft
 .vscode/

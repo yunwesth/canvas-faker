@@ -10,6 +10,8 @@ Requires-Dist: faker>=20.0.0
 Provides-Extra: dev
 Requires-Dist: pytest>=7.0; extra == "dev"
 Requires-Dist: pytest-cov; extra == "dev"
+Provides-Extra: postgres
+Requires-Dist: psycopg2-binary>=2.9; extra == "postgres"
 
 # canvas-faker: Generate Realistic Canvas Data 2 (CD2) Datasets
 
@@ -74,6 +76,52 @@ cfg = GenerationConfig(
 )
 conn = generate_dataset(cfg, "cd2.db")
 ```
+
+## Docker
+
+Run canvas-faker in a container — no local Python or venv required. The generated
+`.db` is written to a mounted host directory.
+
+### Build
+
+```bash
+docker build -t canvas-faker:latest .
+```
+
+### Run
+
+Mount a host directory at `/data` and pass `--user` so the output file is owned by
+you (not root):
+
+```bash
+# Default: small dataset, seed 42 -> ./out/cd2.db
+mkdir -p out
+docker run --rm --user $(id -u):$(id -g) -v "$PWD/out:/data" canvas-faker:latest
+
+# Override any CLI flag
+docker run --rm --user $(id -u):$(id -g) -v "$PWD/out:/data" \
+  canvas-faker:latest --scale medium --seed 99 --out /data/medium.db
+
+# Clean data (no messiness)
+docker run --rm --user $(id -u):$(id -g) -v "$PWD/out:/data" \
+  canvas-faker:latest --clean --out /data/clean.db
+```
+
+### Docker Compose
+
+```bash
+export UID="$(id -u)" GID="$(id -g)"      # so output is owned by you
+docker compose run --rm gen                          # -> ./out/cd2.db
+docker compose run --rm gen --scale medium --seed 99 # override flags
+```
+
+### Notes
+
+- Multi-stage build: a wheel is built in a `builder` stage, then installed into a
+  slim runtime — no build tooling ships in the final image.
+- Runs as a non-root user; `/data` is the volume mount point.
+- The image entrypoint is the `canvas-faker` CLI, so anything after the image name
+  is passed straight through as CLI flags.
 
 ## Schema Coverage
 
@@ -180,6 +228,91 @@ canvas_faker/
 
 ## Example: Querying the Generated Data
 
+### Sample Dataset Overview
+
+After running `/cd2-gen small 42 /tmp/demo.db`, you get ~11,000 rows across 121 tables:
+- **84 canvas tables**: courses (8), users (76), enrollments, submissions (1,200), grades, discussions
+- **3,215 web logs**: request logs with realistic HTTP status codes
+- **28 catalog tables**: e-commerce data (~100 rows)
+- **8 new_quizzes tables**: quiz data (~160 rows)
+
+### Realistic Messiness Present
+- **63 late submissions** (with seconds_late calculated)
+- **51 missing submissions** (no grade, no submission)
+- **Soft deletes**: some users/enrollments marked as deleted
+- **Bounced emails**: a few communication_channels with bounce_count
+- **Merged users**: rare duplicate-detection scenarios
+- **Partial SIS linkage**: ~30-40% of rows lack sis_source_id
+
+### First 10 Users
+```
+id  name               sortable_name       created_at            workflow_state
+--  -----------------  ------------------  --------------------  --------------
+1   Sharon James       James, Sharon       2023-04-02T16:55:25Z  registered    
+2   Tricia Valencia    Valencia, Tricia    2022-08-24T17:46:20Z  registered    
+3   Joseph Martinez    Martinez, Joseph    2022-12-09T08:22:04Z  registered    
+4   Dr. Steven Martin  Martin, Dr. Steven  2022-08-20T01:51:52Z  registered    
+5   Sherry Wood        Wood, Sherry        2022-11-05T20:57:43Z  registered    
+6   Timothy Hancock    Hancock, Timothy    2023-12-20T02:28:20Z  registered    
+7   Jeffrey Rush       Rush, Jeffrey       2023-11-22T09:15:00Z  registered    
+8   Shannon Mcclure    Mcclure, Shannon    2023-09-12T05:02:41Z  registered    
+9   Sarah Ashley       Ashley, Sarah       2023-03-16T12:15:19Z  registered    
+10  Ashley Weiss       Weiss, Ashley       2023-12-14T08:38:57Z  registered
+```
+
+### All Courses (8 total)
+```
+id  name                                course_code  workflow_state
+--  ----------------------------------  -----------  --------------
+1   Seminar in Marketing                MKT-401-W    available     
+2   History of English                  ENGL-499     available     
+3   Applied Spanish                     SPAN-201-01  available     
+4   Advanced Spanish                    SPAN-202     available     
+5   History of Spanish                  SPAN-499     available     
+6   Seminar in History                  HIST-202     available     
+7   Theory and Practice of Mathematics  MATH-499-H   available     
+8   Advanced Education                  EDUC-401-01  available
+```
+
+### Submissions with Grades (sample)
+```
+id  name            title               score  grade  late  missing
+--  --------------  ------------------  -----  -----  ----  -------
+1   Gregory Flores  Midterm Exam        8.9    B+     0     0      
+2   Gregory Flores  Lab Report 2        19.9   C+     0     0      
+3   Gregory Flores  Essay 3             6.5    D      0     0      
+6   Gregory Flores  Lab Report 6        84.4   B      0     0      
+7   Jesus Braun     Midterm Exam        9.7    A      0     0      
+9   Jesus Braun     Essay 3             5.6    F      0     0      
+10  Jesus Braun     Homework 4          4.3    F      0     0      
+11  Jesus Braun     Reading Response 5  16.1   D      0     0
+```
+
+### Discussion Posts (sample)
+```
+id  name               title                          message                                           
+--  -----------------  -----------------------------  --------------------------------------------------
+1   Kyle Smith         Reflection on Core Vocabulary  Bill though indeed ability difference. Interview...
+2   Jeffrey Rush       Reflection on Core Vocabulary  College body big what ground past brother.        
+3   Gerald Chavez      Reflection on Core Vocabulary  Page concern most.                                
+4   Scott Smith        Reflection on Core Vocabulary  Throw reach person expert. Even material hard ente
+5   Keith Rodriguez    Reflection on Core Vocabulary  Technology within sing.                           
+6   Raymond Thomas     Reflection on Core Vocabulary  Land someone with spring both into.
+```
+
+### Late Submissions (sample, showing seconds_late)
+```
+id   name             title               score  seconds_late
+---  ---------------  ------------------  -----  ------------
+29   Gerald Chavez    Reading Response 5  18.1   104610       (29 hours late)
+47   Laura Berry      Reading Response 5  15.0   337386       (93+ hours late)
+50   Scott Smith      Lab Report 2        19.8   47715        (13+ hours late)
+63   Derek Thomas     Essay 3             9.7    140033       (38+ hours late)
+147  Kyle Smith       Essay 3             7.8    26081        (7+ hours late)
+```
+
+### SQL Queries to Explore
+
 ```sql
 -- Student grades (canonical CD2 join)
 SELECT u.name, c.course_code, s.current_score, s.final_grade
@@ -205,6 +338,29 @@ FROM canvas__communication_channels cc
 JOIN canvas__users u ON u.id = cc.user_id
 WHERE cc.workflow_state = 'bounced'
 ORDER BY cc.bounce_count DESC;
+
+-- Missing submissions
+SELECT u.name, a.title
+FROM canvas__submissions sub
+JOIN canvas__assignments a ON a.id = sub.assignment_id
+JOIN canvas__users u ON u.id = sub.user_id
+WHERE sub.missing = 1;
+```
+
+### Quick Inspect with Skills
+
+```bash
+# Generate a dataset
+/cd2-gen small 42 /tmp/demo.db
+
+# Test integrity
+/cd2-test /tmp/demo.db
+
+# Get stats & sample rows
+/cd2-inspect /tmp/demo.db
+
+# Query directly
+sqlite3 /tmp/demo.db "SELECT COUNT(*) FROM canvas__submissions WHERE late=1;"
 ```
 
 ## Future Work (not in v0.1)

@@ -39,6 +39,10 @@ class Column:
     def sqlite_type(self) -> str:
         return _SQLITE_TYPE.get(self.code, "TEXT")
 
+    @property
+    def pg_type(self) -> str:
+        return _PG_TYPE.get(self.code, "TEXT")
+
 
 _SQLITE_TYPE = {
     "pk": "INTEGER",
@@ -53,6 +57,21 @@ _SQLITE_TYPE = {
     "json": "TEXT",
     "uuid": "TEXT",
     "fk": "INTEGER",
+}
+
+_PG_TYPE = {
+    "pk": "BIGINT",
+    "strpk": "TEXT",
+    "uuidpk": "TEXT",   # CD2 uuid fields are opaque tokens, not strict UUIDs
+    "int": "BIGINT",
+    "f": "DOUBLE PRECISION",
+    "bool": "BOOLEAN",
+    "dt": "TIMESTAMPTZ",
+    "date": "DATE",
+    "str": "TEXT",
+    "json": "JSONB",
+    "uuid": "TEXT",     # same reason — Canvas stores non-standard strings here
+    "fk": "BIGINT",
 }
 
 _PK_CODES = {"pk", "strpk", "uuidpk"}

@@ -1,24 +1,83 @@
 # Convenience wrapper for canvas-faker.
 #
-#   docker compose run --rm gen                          # small/seed=42 -> ./out/cd2.db
-#   docker compose run --rm gen --scale medium --seed 99 # override any flag
-#   docker compose run --rm gen --clean --out /data/clean.db
+# SQLite generation (original):
+#   docker compose run --rm gen                           # small/seed=42 -> ./out/cd2.db
+#   docker compose run --rm gen --scale medium --seed 99
 #
-# Generated databases land in ./out on the host (mounted at /data).
+# Postgres stack (pgAdmin4 UI):
+#   docker compose up -d postgres pgadmin
+#   docker compose run --rm gen-pg                        # populate postgres
+#   open http://localhost:5050  (email: admin@canvas.local  password: canvas)
+#   Register server: host=postgres port=5432 user=canvas password=canvas db=cd2
 #
-# The `user:` line makes the container write files as YOUR host uid/gid so the
-# generated .db is owned by you (not root). Export them once per shell:
+# Datasette (lightweight browse):
+#   docker compose up serve      -> http://localhost:8001
 #
+# The `user:` line makes the gen container write files as YOUR host uid/gid.
+# Export once per shell before running gen:
 #   export UID="$(id -u)" GID="$(id -g)"
-#
-# (falls back to 1000:1000 if unset).
 
 services:
+
+  # ── SQLite generator (original) ────────────────────────────────────────────
   gen:
     build: .
     image: canvas-faker:latest
     user: "${UID:-1000}:${GID:-1000}"
     volumes:
       - ./out:/data
-    # ENTRYPOINT is `canvas-faker`; args here override the image CMD.
     command: ["--out", "/data/cd2.db", "--scale", "small", "--seed", "42"]
+
+  # ── Datasette (read-only browse of baked-in sample DB) ────────────────────
+  serve:
+    build:
+      context: .
+      dockerfile: Dockerfile.datasette
+    image: canvas-faker-datasette:latest
+    ports:
+      - "8001:8001"
+
+  # ── PostgreSQL ─────────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: cd2
+      POSTGRES_USER: canvas
+      POSTGRES_PASSWORD: canvas
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U canvas -d cd2"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # ── Postgres generator (one-shot: populates the postgres service) ──────────
+  gen-pg:
+    build: .
+    image: canvas-faker:latest
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: ["--pg-url", "postgresql://canvas:canvas@postgres:5432/cd2", "--scale", "small", "--seed", "42"]
+
+  # ── pgAdmin 4 ──────────────────────────────────────────────────────────────
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    restart: unless-stopped
+    depends_on:
+      - postgres
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@canvas.com
+      PGADMIN_DEFAULT_PASSWORD: canvas
+    ports:
+      - "5050:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+
+volumes:
+  pg_data:
+  pgadmin_data:
